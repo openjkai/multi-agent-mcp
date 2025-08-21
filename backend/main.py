@@ -38,6 +38,35 @@ async def health_check():
         "message": "Backend is running successfully"
     }
 
+@app.get("/test-mcp")
+async def test_mcp():
+    """Test MCP client functionality"""
+    from core.mcp_client import MCPClient
+    
+    client = MCPClient()
+    await client.connect("http://localhost:8001", "test-agent")
+    
+    try:
+        # Test query
+        response = await client.send_query("Hello, test query!")
+        status = await client.get_status()
+        
+        await client.cleanup()
+        
+        return {
+            "test": "MCP Client",
+            "status": "success",
+            "response": response,
+            "client_status": status
+        }
+    except Exception as e:
+        await client.cleanup()
+        return {
+            "test": "MCP Client",
+            "status": "error",
+            "error": str(e)
+        }
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(
