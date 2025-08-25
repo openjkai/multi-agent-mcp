@@ -67,6 +67,44 @@ async def test_mcp():
             "error": str(e)
         }
 
+@app.get("/test-agent")
+async def test_agent():
+    """Test agent interface functionality"""
+    from core.agent_interface import MockAgent
+    
+    # Create a mock agent
+    agent = MockAgent(
+        agent_id="test-agent-001",
+        name="Test Agent",
+        capabilities=["testing", "mock_responses", "health_check"]
+    )
+    
+    # Activate and test
+    await agent.activate()
+    
+    try:
+        # Test query processing
+        response = await agent.process_query("Hello from test endpoint!")
+        status = agent.get_status()
+        health = await agent.health_check()
+        
+        await agent.deactivate()
+        
+        return {
+            "test": "Agent Interface",
+            "status": "success",
+            "agent_response": response,
+            "agent_status": status,
+            "health_check": health
+        }
+    except Exception as e:
+        await agent.deactivate()
+        return {
+            "test": "Agent Interface",
+            "status": "error",
+            "error": str(e)
+        }
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(
