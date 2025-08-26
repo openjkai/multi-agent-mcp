@@ -105,6 +105,47 @@ async def test_agent():
             "error": str(e)
         }
 
+@app.get("/test-registry")
+async def test_registry():
+    """Test agent registry functionality"""
+    from core.agent_registry import AgentRegistry
+    from core.agent_interface import MockAgent
+    
+    # Create registry
+    registry = AgentRegistry()
+    
+    try:
+        # Create and register multiple agents
+        agent1 = MockAgent("docs-agent", "Document Agent", ["document_processing", "qa"])
+        agent2 = MockAgent("code-agent", "Code Agent", ["code_analysis", "refactoring"])
+        
+        # Register agents
+        await registry.register_agent(agent1)
+        await registry.register_agent(agent2)
+        
+        # Test registry functions
+        all_agents = registry.list_agents()
+        registry_status = registry.get_registry_status()
+        health_status = await registry.health_check_all()
+        
+        # Cleanup
+        await registry.unregister_agent("docs-agent")
+        await registry.unregister_agent("code-agent")
+        
+        return {
+            "test": "Agent Registry",
+            "status": "success",
+            "registered_agents": len(all_agents),
+            "registry_status": registry_status,
+            "health_status": health_status
+        }
+    except Exception as e:
+        return {
+            "test": "Agent Registry",
+            "status": "error",
+            "error": str(e)
+        }
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(
