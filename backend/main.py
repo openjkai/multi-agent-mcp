@@ -146,6 +146,92 @@ async def test_registry():
             "error": str(e)
         }
 
+@app.get("/test-manager")
+async def test_manager():
+    """Test agent manager functionality"""
+    from core.agent_manager import AgentManager
+    
+    # Create and initialize manager
+    manager = AgentManager()
+    
+    try:
+        await manager.initialize()
+        
+        # Test query routing
+        test_queries = [
+            "Can you analyze this PDF document?",
+            "Help me refactor this Python code",
+            "Search for latest AI news",
+            "Just have a general chat"
+        ]
+        
+        results = []
+        for query in test_queries:
+            try:
+                result = await manager.route_query(query)
+                results.append({
+                    "query": query,
+                    "result": result
+                })
+            except Exception as e:
+                results.append({
+                    "query": query,
+                    "error": str(e)
+                })
+        
+        # Get system status
+        system_status = await manager.get_system_status()
+        
+        # Cleanup
+        await manager.cleanup()
+        
+        return {
+            "test": "Agent Manager",
+            "status": "success",
+            "query_results": results,
+            "system_status": system_status
+        }
+    except Exception as e:
+        try:
+            await manager.cleanup()
+        except:
+            pass
+        
+        return {
+            "test": "Agent Manager",
+            "status": "error",
+            "error": str(e)
+        }
+
+@app.post("/query")
+async def process_query(query: str):
+    """Process a query through the agent system"""
+    from core.agent_manager import AgentManager
+    
+    # For now, create a new manager instance
+    # In production, this would be a singleton
+    manager = AgentManager()
+    
+    try:
+        await manager.initialize()
+        result = await manager.route_query(query)
+        await manager.cleanup()
+        
+        return {
+            "status": "success",
+            "result": result
+        }
+    except Exception as e:
+        try:
+            await manager.cleanup()
+        except:
+            pass
+        
+        return {
+            "status": "error",
+            "error": str(e)
+        }
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(
