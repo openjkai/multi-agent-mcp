@@ -38,6 +38,16 @@ async def health_check():
         "message": "Backend is running successfully"
     }
 
+@app.get("/config")
+async def get_config():
+    """Get application configuration"""
+    from config import get_config_dict
+    
+    return {
+        "status": "success",
+        "configuration": get_config_dict()
+    }
+
 @app.get("/test-mcp")
 async def test_mcp():
     """Test MCP client functionality"""
@@ -228,6 +238,165 @@ async def process_query(query: str):
             pass
         
         return {
+            "status": "error",
+            "error": str(e)
+        }
+
+# RAG Pipeline Endpoints
+@app.post("/rag/upload")
+async def upload_document(filename: str, content: str, content_type: str = "text"):
+    """Upload and process a document for RAG"""
+    from core.rag_pipeline import RAGPipeline
+    
+    rag = RAGPipeline()
+    
+    try:
+        await rag.initialize()
+        doc_info = await rag.process_document(filename, content, content_type)
+        await rag.cleanup()
+        
+        return {
+            "status": "success",
+            "message": "Document processed successfully",
+            "document": {
+                "id": doc_info.id,
+                "filename": doc_info.filename,
+                "chunk_count": doc_info.chunk_count,
+                "processing_status": doc_info.processing_status
+            }
+        }
+    except Exception as e:
+        try:
+            await rag.cleanup()
+        except:
+            pass
+        
+        return {
+            "status": "error",
+            "error": str(e)
+        }
+
+@app.post("/rag/query")
+async def rag_query(query: str, top_k: int = 5):
+    """Query the RAG system"""
+    from core.rag_pipeline import RAGPipeline
+    
+    rag = RAGPipeline()
+    
+    try:
+        await rag.initialize()
+        results = await rag.query(query, top_k)
+        await rag.cleanup()
+        
+        return {
+            "status": "success",
+            "query": query,
+            "results": results,
+            "total_results": len(results)
+        }
+    except Exception as e:
+        try:
+            await rag.cleanup()
+        except:
+            pass
+        
+        return {
+            "status": "error",
+            "error": str(e)
+        }
+
+@app.get("/rag/status")
+async def rag_status():
+    """Get RAG pipeline status"""
+    from core.rag_pipeline import RAGPipeline
+    
+    rag = RAGPipeline()
+    
+    try:
+        await rag.initialize()
+        status = await rag.get_status()
+        await rag.cleanup()
+        
+        return {
+            "status": "success",
+            "rag_status": status
+        }
+    except Exception as e:
+        try:
+            await rag.cleanup()
+        except:
+            pass
+        
+        return {
+            "status": "error",
+            "error": str(e)
+        }
+
+@app.get("/rag/test")
+async def test_rag():
+    """Test RAG pipeline with sample documents"""
+    from core.rag_pipeline import RAGPipeline
+    
+    rag = RAGPipeline()
+    
+    try:
+        await rag.initialize()
+        
+        # Upload sample documents
+        sample_docs = [
+            {
+                "filename": "sample_ai_article.txt",
+                "content": "Artificial Intelligence is transforming the world. Machine learning algorithms can now process vast amounts of data and make predictions with high accuracy. Deep learning has revolutionized computer vision and natural language processing.",
+                "content_type": "text"
+            },
+            {
+                "filename": "sample_code_guide.md",
+                "content": "# Python Programming Guide\n\n## Variables\nVariables store data in Python.\n\n## Functions\nFunctions are reusable blocks of code.\n\n## Classes\nClasses define object-oriented structures.",
+                "content_type": "markdown"
+            }
+        ]
+        
+        uploaded_docs = []
+        for doc in sample_docs:
+            doc_info = await rag.process_document(doc["filename"], doc["content"], doc["content_type"])
+            uploaded_docs.append(doc_info)
+        
+        # Test queries
+        test_queries = [
+            "What is artificial intelligence?",
+            "How do functions work in Python?",
+            "What are the benefits of machine learning?"
+        ]
+        
+        query_results = []
+        for query in test_queries:
+            results = await rag.query(query, top_k=3)
+            query_results.append({
+                "query": query,
+                "results": results
+            })
+        
+        # Get final status
+        status = await rag.get_status()
+        
+        await rag.cleanup()
+        
+        return {
+            "test": "RAG Pipeline",
+            "status": "success",
+            "uploaded_documents": len(uploaded_docs),
+            "test_queries": query_results,
+            "pipeline_status": status
+        }
+        
+    except Exception as e:
+        try:
+            await rag.cleanup()
+        except:
+            pass
+        
+        return {
+            "test": "RAG Pipeline",
             "status": "error",
             "error": str(e)
         }
