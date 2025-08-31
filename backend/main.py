@@ -401,6 +401,154 @@ async def test_rag():
             "error": str(e)
         }
 
+@app.get("/embeddings/providers")
+async def get_embedding_providers():
+    """Get available embedding providers"""
+    from core.embeddings import EmbeddingManager
+    
+    manager = EmbeddingManager()
+    
+    try:
+        await manager.initialize()
+        providers = manager.get_available_providers()
+        
+        provider_info = {}
+        for provider in providers:
+            provider_info[provider] = manager.get_provider_info(provider)
+        
+        await manager.cleanup()
+        
+        return {
+            "status": "success",
+            "available_providers": providers,
+            "provider_details": provider_info,
+            "default_provider": manager.default_provider
+        }
+    except Exception as e:
+        try:
+            await manager.cleanup()
+        except:
+            pass
+        
+        return {
+            "status": "error",
+            "error": str(e)
+        }
+
+@app.post("/embeddings/generate")
+async def generate_embeddings(texts: List[str], provider: str = None):
+    """Generate embeddings for texts"""
+    from core.embeddings import EmbeddingManager
+    
+    manager = EmbeddingManager()
+    
+    try:
+        await manager.initialize()
+        result = await manager.generate_embeddings(texts, provider)
+        await manager.cleanup()
+        
+        return {
+            "status": "success",
+            "embeddings_count": len(result.embeddings),
+            "model": result.model,
+            "dimensions": result.dimensions,
+            "tokens_used": result.tokens_used,
+            "cost": result.cost
+        }
+    except Exception as e:
+        try:
+            await manager.cleanup()
+        except:
+            pass
+        
+        return {
+            "status": "error",
+            "error": str(e)
+        }
+
+@app.post("/pdf/process")
+async def process_pdf(filename: str, file_content: bytes):
+    """Process PDF file and extract content"""
+    from core.pdf_processor import PDFProcessor
+    
+    processor = PDFProcessor()
+    
+    try:
+        if not processor.can_process(filename):
+            return {
+                "status": "error",
+                "error": f"File format not supported: {filename}"
+            }
+        
+        pdf_doc = await processor.process_pdf(file_content, filename)
+        
+        # Analyze document structure
+        analysis = processor.analyze_document_structure(pdf_doc)
+        
+        return {
+            "status": "success",
+            "filename": filename,
+            "total_pages": pdf_doc.total_pages,
+            "total_characters": len(pdf_doc.text_content),
+            "total_words": len(pdf_doc.text_content.split()),
+            "tables_found": len(pdf_doc.extracted_tables),
+            "images_found": len(pdf_doc.extracted_images),
+            "document_analysis": analysis,
+            "metadata": pdf_doc.metadata
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e)
+        }
+
+@app.get("/system/status")
+async def get_system_status():
+    """Get comprehensive system status"""
+    from core.agent_manager import AgentManager
+    from core.rag_pipeline import RAGPipeline
+    from core.embeddings import EmbeddingManager
+    
+    try:
+        # Get agent manager status
+        agent_manager = AgentManager()
+        await agent_manager.initialize()
+        agent_status = await agent_manager.get_system_status()
+        await agent_manager.cleanup()
+        
+        # Get RAG pipeline status
+        rag = RAGPipeline()
+        await rag.initialize()
+        rag_status = await rag.get_status()
+        await rag.cleanup()
+        
+        # Get embedding manager status
+        embedding_manager = EmbeddingManager()
+        await embedding_manager.initialize()
+        embedding_providers = embedding_manager.get_available_providers()
+        await embedding_manager.cleanup()
+        
+        return {
+            "status": "success",
+            "timestamp": datetime.utcnow().isoformat(),
+            "system": {
+                "name": "Multi-Agent MCP",
+                "version": "0.1.0",
+                "status": "running"
+            },
+            "agents": agent_status,
+            "rag_pipeline": rag_status,
+            "embeddings": {
+                "available_providers": embedding_providers,
+                "status": "initialized"
+            }
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e)
+        }
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(
