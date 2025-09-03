@@ -11,6 +11,7 @@ from dataclasses import dataclass
 
 from .agent_registry import AgentRegistry
 from .agent_interface import BaseAgent, MockAgent
+from .specialized_agents import DocumentAgent, WebAgent, ChatAgent, CodeAgent
 from .mcp_client import MCPClient
 
 logger = logging.getLogger(__name__)
@@ -51,122 +52,139 @@ class AgentManager:
     async def _register_default_agents(self):
         """Register default agents for testing"""
         default_agents = [
-            {
-                "id": "docs-agent-001",
-                "name": "Document Analysis Agent",
-                "capabilities": ["document_processing", "qa", "summarization"],
-                "mcp_endpoint": "http://localhost:8001"
-            },
-            {
-                "id": "code-agent-001",
-                "name": "Code Assistant Agent",
-                "capabilities": ["code_analysis", "refactoring", "generation"],
-                "mcp_endpoint": "http://localhost:8002"
-            },
-            {
-                "id": "web-agent-001",
-                "name": "Web Search Agent",
-                "capabilities": ["web_search", "news_fetching", "fact_checking"],
-                "mcp_endpoint": "http://localhost:8003"
-            },
-            {
-                "id": "chat-agent-001",
-                "name": "General Chat Agent",
-                "capabilities": ["conversation", "coordination", "routing"],
-                "mcp_endpoint": "http://localhost:8004"
-            }
+            DocumentAgent(
+                agent_id="docs-agent-001",
+                name="Document Analysis Agent",
+                capabilities=["document_processing", "pdf_analysis", "text_extraction", "qa"]
+            ),
+            CodeAgent(
+                agent_id="code-agent-001", 
+                name="Code Assistant Agent",
+                capabilities=["code_analysis", "refactoring", "code_generation", "debugging"]
+            ),
+            WebAgent(
+                agent_id="web-agent-001",
+                name="Web Search Agent", 
+                capabilities=["web_search", "news_fetching", "fact_checking", "real_time_data"]
+            ),
+            ChatAgent(
+                agent_id="chat-agent-001",
+                name="General Chat Agent",
+                capabilities=["conversation", "task_coordination", "agent_orchestration", "general_qa"]
+            )
         ]
         
-        for agent_config in default_agents:
-            try:
-                # Create mock agent for now
-                agent = MockAgent(
-                    agent_id=agent_config["id"],
-                    name=agent_config["name"],
-                    capabilities=agent_config["capabilities"]
-                )
-                
-                # Register agent
-                await self.registry.register_agent(agent)
-                
-                # Create MCP client
-                mcp_client = MCPClient()
-                await mcp_client.connect(agent_config["mcp_endpoint"], agent_config["id"])
-                self.mcp_clients[agent_config["id"]] = mcp_client
-                
-                # Initialize metrics
-                self.agent_metrics[agent_config["id"]] = AgentMetrics()
-                
-                # Activate agent
-                await agent.activate()
-                
-                logger.info(f"Registered and activated agent: {agent_config['id']}")
-                
-            except Exception as e:
-                logger.error(f"Failed to register default agent {agent_config['id']}: {e}")
+        for agent in default_agents:
+            await self.registry.register_agent(agent)
+            await agent.activate()
+            self.agent_metrics[agent.agent_id] = AgentMetrics()
+            logger.info(f"Registered and activated agent: {agent.name}")
     
     async def route_query(self, query: str, context: Dict[str, Any] = None) -> Dict[str, Any]:
-        """Route query to the most appropriate agent(s)"""
+        """Route query to the most appropriate agent"""
         start_time = datetime.utcnow()
         
-        # Simple routing logic based on query content
-        query_lower = query.lower()
-        selected_agent_id = None
-        
-        # Route based on keywords
-        if any(word in query_lower for word in ["pdf", "document", "file", "read", "analyze", "summarize"]):
-            selected_agent_id = "docs-agent-001"
-        elif any(word in query_lower for word in ["code", "program", "function", "class", "bug", "refactor"]):
-            selected_agent_id = "code-agent-001"
-        elif any(word in query_lower for word in ["search", "web", "news", "current", "latest", "fact"]):
-            selected_agent_id = "web-agent-001"
-        else:
-            selected_agent_id = "chat-agent-001"
-        
-        # Get agent and process query
-        agent = self.registry.get_agent(selected_agent_id)
-        if not agent:
-            raise RuntimeError(f"Agent {selected_agent_id} not found")
-        
         try:
+            # Analyze query to determine best agent
+            agent_id = self._analyze_query_for_routing(query)
+            agent = self.registry.get_agent(agent_id)
+            
+            if not agent:
+                raise ValueError(f"Agent {agent_id} not found")
+            
+            if not agent.is_active:
+                await agent.activate()
+            
             # Process query
-            response = await agent.process_query(query, context or {})
+            result = await agent.process_query(query, context)
             
             # Update metrics
-            await self._update_metrics(selected_agent_id, start_time, True)
+            processing_time = (datetime.utcnow() - start_time).total_seconds()
+            self._update_agent_metrics(agent_id, True, processing_time)
             
-            # Add to query history
+            # Log query
             self.query_history.append({
                 "query": query,
-                "agent_id": selected_agent_id,
-                "response": response,
+                "agent_id": agent_id,
+                "agent_name": agent.name,
                 "timestamp": start_time.isoformat(),
-                "response_time": (datetime.utcnow() - start_time).total_seconds()
+                "processing_time": processing_time,
+                "success": True
             })
             
             return {
-                "response": response,
-                "agent_id": selected_agent_id,
+                "agent_id": agent_id,
                 "agent_name": agent.name,
-                "routing_logic": "keyword_based",
-                "response_time": (datetime.utcnow() - start_time).total_seconds()
+                "response": result,
+                "processing_time": processing_time,
+                "timestamp": start_time.isoformat()
             }
             
         except Exception as e:
-            # Update metrics
-            await self._update_metrics(selected_agent_id, start_time, False)
-            logger.error(f"Error processing query with agent {selected_agent_id}: {e}")
+            processing_time = (datetime.utcnow() - start_time).total_seconds()
+            
+            # Try fallback to chat agent
+            try:
+                chat_agent = self.registry.get_agent("chat-agent-001")
+                if chat_agent and chat_agent.is_active:
+                    result = await chat_agent.process_query(query, context)
+                    self._update_agent_metrics("chat-agent-001", True, processing_time)
+                    
+                    return {
+                        "agent_id": "chat-agent-001",
+                        "agent_name": chat_agent.name,
+                        "response": result,
+                        "processing_time": processing_time,
+                        "timestamp": start_time.isoformat(),
+                        "fallback": True
+                    }
+            except:
+                pass
+            
+            # Log failed query
+            self.query_history.append({
+                "query": query,
+                "agent_id": None,
+                "timestamp": start_time.isoformat(),
+                "processing_time": processing_time,
+                "success": False,
+                "error": str(e)
+            })
+            
+            logger.error(f"Query routing failed: {str(e)}")
             raise
     
-    async def _update_metrics(self, agent_id: str, start_time: datetime, success: bool):
-        """Update agent metrics"""
+    def _analyze_query_for_routing(self, query: str) -> str:
+        """Analyze query to determine the best agent"""
+        query_lower = query.lower()
+        
+        # Document-related keywords
+        doc_keywords = ["pdf", "document", "analyze", "extract", "summarize", "text", "file", "upload"]
+        if any(keyword in query_lower for keyword in doc_keywords):
+            return "docs-agent-001"
+        
+        # Code-related keywords  
+        code_keywords = ["code", "function", "class", "debug", "refactor", "programming", "python", "javascript"]
+        if any(keyword in query_lower for keyword in code_keywords):
+            return "code-agent-001"
+        
+        # Web search keywords
+        web_keywords = ["search", "web", "news", "latest", "current", "find", "lookup", "internet"]
+        if any(keyword in query_lower for keyword in web_keywords):
+            return "web-agent-001"
+        
+        # Default to chat agent
+        return "chat-agent-001"
+    
+    def _update_agent_metrics(self, agent_id: str, success: bool, processing_time: float):
+        """Update agent performance metrics"""
         if agent_id not in self.agent_metrics:
-            return
+            self.agent_metrics[agent_id] = AgentMetrics()
         
         metrics = self.agent_metrics[agent_id]
-        response_time = (datetime.utcnow() - start_time).total_seconds()
-        
         metrics.total_queries += 1
+        metrics.last_query_time = datetime.utcnow()
+        
         if success:
             metrics.successful_queries += 1
         else:
@@ -174,65 +192,83 @@ class AgentManager:
         
         # Update average response time
         if metrics.total_queries == 1:
-            metrics.average_response_time = response_time
+            metrics.average_response_time = processing_time
         else:
             metrics.average_response_time = (
-                (metrics.average_response_time * (metrics.total_queries - 1) + response_time) 
+                (metrics.average_response_time * (metrics.total_queries - 1) + processing_time) 
                 / metrics.total_queries
             )
-        
-        metrics.last_query_time = datetime.utcnow()
-        metrics.uptime = datetime.utcnow() - self.start_time
     
     async def get_system_status(self) -> Dict[str, Any]:
         """Get comprehensive system status"""
-        registry_status = self.registry.get_registry_status()
-        health_status = await self.registry.health_check_all()
+        agents = self.registry.list_agents()
+        active_agents = [agent for agent in agents if agent.is_active]
         
-        # Calculate overall metrics
-        total_queries = sum(m.total_queries for m in self.agent_metrics.values())
-        total_successful = sum(m.successful_queries for m in self.agent_metrics.values())
-        overall_success_rate = total_successful / total_queries if total_queries > 0 else 0
+        # Calculate uptime for each agent
+        current_time = datetime.utcnow()
+        for agent in agents:
+            if agent.agent_id in self.agent_metrics:
+                self.agent_metrics[agent.agent_id].uptime = current_time - agent.created_at
         
         return {
-            "system_status": "running",
-            "uptime": (datetime.utcnow() - self.start_time).total_seconds(),
-            "registry": registry_status,
-            "health": health_status,
-            "metrics": {
-                "total_queries": total_queries,
-                "success_rate": overall_success_rate,
-                "agent_count": len(self.agent_metrics)
-            },
-            "recent_queries": self.query_history[-5:] if self.query_history else []
+            "total_agents": len(agents),
+            "active_agents": len(active_agents),
+            "registered_agents": [
+                {
+                    "agent_id": agent.agent_id,
+                    "name": agent.name,
+                    "capabilities": agent.capabilities,
+                    "is_active": agent.is_active,
+                    "metrics": self.agent_metrics.get(agent.agent_id, AgentMetrics()).__dict__
+                }
+                for agent in agents
+            ],
+            "total_queries_processed": sum(m.total_queries for m in self.agent_metrics.values()),
+            "successful_queries": sum(m.successful_queries for m in self.agent_metrics.values()),
+            "failed_queries": sum(m.failed_queries for m in self.agent_metrics.values()),
+            "system_uptime": str(current_time - self.start_time),
+            "last_updated": current_time.isoformat()
         }
     
     async def _health_monitor_loop(self):
-        """Background health monitoring"""
+        """Background task to monitor agent health"""
         while True:
             try:
-                # Check all agents health
-                health_status = await self.registry.health_check_all()
-                
-                # Log any unhealthy agents
-                for agent_id, is_healthy in health_status.items():
-                    if not is_healthy:
-                        logger.warning(f"Agent {agent_id} is unhealthy")
-                
                 await asyncio.sleep(30)  # Check every 30 seconds
                 
+                agents = self.registry.list_agents()
+                for agent in agents:
+                    if agent.is_active:
+                        try:
+                            healthy = await agent.health_check()
+                            if not healthy:
+                                logger.warning(f"Agent {agent.agent_id} failed health check")
+                                # Could implement auto-restart logic here
+                        except Exception as e:
+                            logger.error(f"Health check failed for agent {agent.agent_id}: {str(e)}")
+                
+            except asyncio.CancelledError:
+                break
             except Exception as e:
-                logger.error(f"Error in health monitor loop: {e}")
-                await asyncio.sleep(60)
+                logger.error(f"Health monitor error: {str(e)}")
     
     async def cleanup(self):
         """Cleanup resources"""
+        logger.info("Cleaning up Agent Manager")
+        
+        # Cancel health monitoring
         if self._health_monitor_task:
             self._health_monitor_task.cancel()
             try:
                 await self._health_monitor_task
             except asyncio.CancelledError:
                 pass
+        
+        # Deactivate all agents
+        agents = self.registry.list_agents()
+        for agent in agents:
+            if agent.is_active:
+                await agent.deactivate()
         
         # Cleanup MCP clients
         for client in self.mcp_clients.values():
