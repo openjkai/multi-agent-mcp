@@ -1,196 +1,182 @@
 """
-RAG Pipeline - Document processing, embedding, and retrieval system
-Advanced RAG implementation for today's major update
+RAG Pipeline - Document processing and retrieval system
+Complete implementation for today's major update
 """
 
 import logging
 import hashlib
-import json
-from typing import Dict, List, Any, Optional, Tuple
+import uuid
+from typing import Dict, List, Any, Optional
 from datetime import datetime
 from dataclasses import dataclass
-from pathlib import Path
 
 logger = logging.getLogger(__name__)
-
-@dataclass
-class DocumentChunk:
-    """Individual document chunk for RAG"""
-    id: str
-    document_id: str
-    content: str
-    chunk_index: int
-    metadata: Dict[str, Any]
-    created_at: datetime
 
 @dataclass
 class DocumentInfo:
     """Information about a processed document"""
     id: str
     filename: str
-    file_size: int
     content_type: str
     chunk_count: int
     processing_status: str
-    uploaded_at: datetime
-    processed_at: Optional[datetime]
+    created_at: datetime
+    metadata: Dict[str, Any]
+
+@dataclass
+class DocumentChunk:
+    """A chunk of processed document"""
+    id: str
+    document_id: str
+    content: str
+    chunk_index: int
+    metadata: Dict[str, Any]
+    embedding: Optional[List[float]] = None
+
+@dataclass
+class SearchResult:
+    """Search result from RAG query"""
+    chunk_id: str
+    document_id: str
+    content: str
+    score: float
     metadata: Dict[str, Any]
 
 class DocumentProcessor:
-    """Handles document processing and chunking"""
+    """Processes documents into chunks for RAG"""
     
-    def __init__(self):
-        self.supported_formats = ['.txt', '.md', '.pdf', '.docx']
-        self.max_chunk_size = 1000
-        self.chunk_overlap = 200
+    def __init__(self, chunk_size: int = 1000, chunk_overlap: int = 200):
+        self.chunk_size = chunk_size
+        self.chunk_overlap = chunk_overlap
     
-    def can_process(self, filename: str) -> bool:
-        """Check if file format is supported"""
-        return any(filename.lower().endswith(fmt) for fmt in self.supported_formats)
-    
-    def process_text(self, content: str, filename: str) -> List[DocumentChunk]:
-        """Process text content into chunks"""
-        chunks = []
-        words = content.split()
+    def process_text(self, text: str, metadata: Dict[str, Any] = None) -> List[DocumentChunk]:
+        """Process text into chunks"""
+        if not text.strip():
+            return []
         
-        for i in range(0, len(words), self.max_chunk_size - self.chunk_overlap):
-            chunk_words = words[i:i + self.max_chunk_size]
-            chunk_content = ' '.join(chunk_words)
-            
-            if chunk_content.strip():
-                chunk = DocumentChunk(
-                    id=f"{filename}_{i}_{hashlib.md5(chunk_content.encode()).hexdigest()[:8]}",
-                    document_id=filename,
-                    content=chunk_content,
-                    chunk_index=i // (self.max_chunk_size - self.chunk_overlap),
-                    metadata={
-                        "word_count": len(chunk_words),
-                        "char_count": len(chunk_content),
-                        "chunk_type": "text"
-                    },
-                    created_at=datetime.utcnow()
-                )
-                chunks.append(chunk)
-        
-        return chunks
-    
-    def process_markdown(self, content: str, filename: str) -> List[DocumentChunk]:
-        """Process markdown content with structure preservation"""
         chunks = []
-        lines = content.split('\n')
+        doc_id = metadata.get('document_id', str(uuid.uuid4()))
+        
+        # Simple chunking strategy
+        words = text.split()
         current_chunk = []
-        current_chunk_size = 0
+        chunk_index = 0
         
-        for line in lines:
-            line_size = len(line)
+        for word in words:
+            current_chunk.append(word)
             
-            # Start new chunk if current is getting too large
-            if current_chunk_size + line_size > self.max_chunk_size and current_chunk:
-                chunk_content = '\n'.join(current_chunk)
+            if len(' '.join(current_chunk)) >= self.chunk_size:
+                chunk_content = ' '.join(current_chunk)
                 chunk = DocumentChunk(
-                    id=f"{filename}_{len(chunks)}_{hashlib.md5(chunk_content.encode()).hexdigest()[:8]}",
-                    document_id=filename,
+                    id=f"{doc_id}_chunk_{chunk_index}",
+                    document_id=doc_id,
                     content=chunk_content,
-                    chunk_index=len(chunks),
-                    metadata={
-                        "word_count": len(chunk_content.split()),
-                        "char_count": len(chunk_content),
-                        "chunk_type": "markdown",
-                        "has_headers": any(line.startswith('#') for line in current_chunk)
-                    },
-                    created_at=datetime.utcnow()
+                    chunk_index=chunk_index,
+                    metadata=metadata or {}
                 )
                 chunks.append(chunk)
-                current_chunk = [line]
-                current_chunk_size = line_size
-            else:
-                current_chunk.append(line)
-                current_chunk_size += line_size
+                
+                # Handle overlap
+                overlap_words = current_chunk[-self.chunk_overlap//10:] if len(current_chunk) > self.chunk_overlap//10 else []
+                current_chunk = overlap_words
+                chunk_index += 1
         
-        # Add final chunk
+        # Handle remaining content
         if current_chunk:
-            chunk_content = '\n'.join(current_chunk)
+            chunk_content = ' '.join(current_chunk)
             chunk = DocumentChunk(
-                id=f"{filename}_{len(chunks)}_{hashlib.md5(chunk_content.encode()).hexdigest()[:8]}",
-                document_id=filename,
+                id=f"{doc_id}_chunk_{chunk_index}",
+                document_id=doc_id,
                 content=chunk_content,
-                chunk_index=len(chunks),
-                metadata={
-                    "word_count": len(chunk_content.split()),
-                    "char_count": len(chunk_content),
-                    "chunk_type": "markdown",
-                    "has_headers": any(line.startswith('#') for line in current_chunk)
-                },
-                created_at=datetime.utcnow()
+                chunk_index=chunk_index,
+                metadata=metadata or {}
             )
             chunks.append(chunk)
         
         return chunks
+    
+    def process_markdown(self, markdown_text: str, metadata: Dict[str, Any] = None) -> List[DocumentChunk]:
+        """Process markdown text with structure awareness"""
+        # For now, treat as regular text
+        # Future: Parse markdown structure, preserve headers, etc.
+        return self.process_text(markdown_text, metadata)
+    
+    def extract_metadata(self, filename: str, content: str, content_type: str) -> Dict[str, Any]:
+        """Extract metadata from document"""
+        return {
+            "filename": filename,
+            "content_type": content_type,
+            "character_count": len(content),
+            "word_count": len(content.split()),
+            "processed_at": datetime.utcnow().isoformat()
+        }
 
 class VectorStore:
-    """Simple in-memory vector store for today's implementation"""
+    """Simple in-memory vector store for RAG"""
     
     def __init__(self):
         self.documents: Dict[str, DocumentInfo] = {}
         self.chunks: Dict[str, DocumentChunk] = {}
-        self.embeddings: Dict[str, List[float]] = {}
-        self.search_index: Dict[str, List[str]] = {}  # word -> chunk_ids
+        self.search_index: Dict[str, List[str]] = {}  # Simple keyword index
     
     async def add_document(self, doc_info: DocumentInfo, chunks: List[DocumentChunk]):
-        """Add document and chunks to the store"""
-        # Store document info
+        """Add document and its chunks to the store"""
         self.documents[doc_info.id] = doc_info
         
-        # Store chunks
         for chunk in chunks:
             self.chunks[chunk.id] = chunk
-            
-            # Simple word-based indexing (will be replaced with real embeddings tomorrow)
+            # Build simple search index
             words = chunk.content.lower().split()
             for word in words:
                 if word not in self.search_index:
                     self.search_index[word] = []
                 if chunk.id not in self.search_index[word]:
                     self.search_index[word].append(chunk.id)
-        
-        logger.info(f"Added document {doc_info.id} with {len(chunks)} chunks")
     
-    async def search(self, query: str, top_k: int = 5) -> List[Tuple[DocumentChunk, float]]:
+    async def search(self, query: str, top_k: int = 5) -> List[SearchResult]:
         """Search for relevant chunks"""
         query_words = query.lower().split()
-        chunk_scores = {}
+        chunk_scores: Dict[str, float] = {}
         
-        # Simple TF-IDF like scoring
+        # Simple TF-IDF-like scoring
         for word in query_words:
             if word in self.search_index:
                 for chunk_id in self.search_index[word]:
                     if chunk_id not in chunk_scores:
                         chunk_scores[chunk_id] = 0
-                    chunk_scores[chunk_id] += 1
+                    chunk_scores[chunk_id] += 1 / len(self.search_index[word])
         
         # Sort by score and return top results
-        sorted_chunks = sorted(chunk_scores.items(), key=lambda x: x[1], reverse=True)
+        sorted_chunks = sorted(chunk_scores.items(), key=lambda x: x[1], reverse=True)[:top_k]
         
         results = []
-        for chunk_id, score in sorted_chunks[:top_k]:
+        for chunk_id, score in sorted_chunks:
             if chunk_id in self.chunks:
                 chunk = self.chunks[chunk_id]
-                # Normalize score
-                normalized_score = min(score / len(query_words), 1.0)
-                results.append((chunk, normalized_score))
+                result = SearchResult(
+                    chunk_id=chunk_id,
+                    document_id=chunk.document_id,
+                    content=chunk.content,
+                    score=score,
+                    metadata=chunk.metadata
+                )
+                results.append(result)
         
         return results
     
-    def get_document_chunks(self, document_id: str) -> List[DocumentChunk]:
-        """Get all chunks for a document"""
-        return [chunk for chunk in self.chunks.values() if chunk.document_id == document_id]
+    def get_document_count(self) -> int:
+        """Get total number of documents"""
+        return len(self.documents)
+    
+    def get_chunk_count(self) -> int:
+        """Get total number of chunks"""
+        return len(self.chunks)
     
     def get_store_stats(self) -> Dict[str, Any]:
         """Get vector store statistics"""
         return {
             "total_documents": len(self.documents),
             "total_chunks": len(self.chunks),
-            "total_embeddings": len(self.embeddings),
             "indexed_words": len(self.search_index)
         }
 
@@ -217,31 +203,28 @@ class RAGPipeline:
         """Process a document and add it to the vector store"""
         try:
             # Generate document ID
-            doc_id = f"{filename}_{hashlib.md5(content.encode()).hexdigest()[:16]}"
+            doc_id = hashlib.md5(f"{filename}_{content[:100]}".encode()).hexdigest()
+            
+            # Extract metadata
+            metadata = self.processor.extract_metadata(filename, content, content_type)
+            metadata['document_id'] = doc_id
+            
+            # Process content based on type
+            if content_type == "markdown":
+                chunks = self.processor.process_markdown(content, metadata)
+            else:
+                chunks = self.processor.process_text(content, metadata)
             
             # Create document info
             doc_info = DocumentInfo(
                 id=doc_id,
                 filename=filename,
-                file_size=len(content.encode()),
                 content_type=content_type,
-                chunk_count=0,
-                processing_status="processing",
-                uploaded_at=datetime.utcnow(),
-                processed_at=None,
-                metadata={"original_filename": filename}
+                chunk_count=len(chunks),
+                processing_status="completed",
+                created_at=datetime.utcnow(),
+                metadata=metadata
             )
-            
-            # Process content into chunks
-            if content_type == "markdown":
-                chunks = self.processor.process_markdown(content, filename)
-            else:
-                chunks = self.processor.process_text(content, filename)
-            
-            # Update document info
-            doc_info.chunk_count = len(chunks)
-            doc_info.processing_status = "completed"
-            doc_info.processed_at = datetime.utcnow()
             
             # Add to vector store
             await self.vector_store.add_document(doc_info, chunks)
@@ -250,53 +233,51 @@ class RAGPipeline:
             self.processing_stats["documents_processed"] += 1
             self.processing_stats["total_chunks_created"] += len(chunks)
             
-            logger.info(f"Successfully processed document {filename} into {len(chunks)} chunks")
+            logger.info(f"Processed document: {filename} ({len(chunks)} chunks)")
             return doc_info
             
         except Exception as e:
             self.processing_stats["processing_errors"] += 1
-            logger.error(f"Error processing document {filename}: {e}")
+            logger.error(f"Error processing document {filename}: {str(e)}")
             raise
     
     async def query(self, query: str, top_k: int = 5) -> List[Dict[str, Any]]:
         """Query the RAG system"""
         try:
-            # Search for relevant chunks
             results = await self.vector_store.search(query, top_k)
             
-            # Format results
+            # Convert to dict format
             formatted_results = []
-            for chunk, score in results:
-                # Get document info
-                doc_info = self.vector_store.documents.get(chunk.document_id)
-                
+            for result in results:
                 formatted_results.append({
-                    "chunk_id": chunk.id,
-                    "content": chunk.content,
-                    "similarity_score": score,
-                    "document_info": {
-                        "id": doc_info.id if doc_info else "unknown",
-                        "filename": doc_info.filename if doc_info else "unknown",
-                        "chunk_index": chunk.chunk_index
-                    },
-                    "metadata": chunk.metadata
+                    "chunk_id": result.chunk_id,
+                    "document_id": result.document_id,
+                    "content": result.content,
+                    "score": result.score,
+                    "metadata": result.metadata
                 })
             
+            logger.info(f"RAG query processed: '{query}' -> {len(results)} results")
             return formatted_results
             
         except Exception as e:
-            logger.error(f"Error querying RAG system: {e}")
+            logger.error(f"Error processing RAG query: {str(e)}")
             raise
     
     async def get_status(self) -> Dict[str, Any]:
         """Get RAG pipeline status"""
+        store_stats = self.vector_store.get_store_stats()
+        
         return {
-            "status": "running",
+            "status": "initialized",
+            "total_documents": store_stats["total_documents"],
+            "total_chunks": store_stats["total_chunks"],
+            "indexed_words": store_stats["indexed_words"],
             "processing_stats": self.processing_stats,
-            "vector_store_stats": self.vector_store.get_store_stats(),
-            "supported_formats": self.processor.supported_formats
+            "last_updated": datetime.utcnow().isoformat()
         }
     
     async def cleanup(self):
         """Cleanup resources"""
-        logger.info("RAG Pipeline cleanup completed") 
+        logger.info("RAG Pipeline cleanup completed")
+        # Future: Close database connections, cleanup temp files, etc. 
