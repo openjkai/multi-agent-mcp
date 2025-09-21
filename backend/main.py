@@ -1,262 +1,232 @@
 """
-Multi-Agent MCP - Main FastAPI Application
-Core orchestrator for managing MCP agents and RAG pipeline
+Multi-Agent MCP - Enhanced FastAPI Application
+Enterprise-level orchestrator with authentication, workflows, and advanced features
+3-day development plan implementation
 """
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from typing import List
+from fastapi.security import HTTPBearer
+from contextlib import asynccontextmanager
+import logging
 from datetime import datetime
 
+# Import core modules
+from core.database import db_manager
+from core.auth import auth_manager
+from core.workflow_engine import get_workflow_engine
+from core.agent_manager import AgentManager
+from core.rag_pipeline import RAGPipeline
+from core.advanced_rag import AdvancedRAGPipeline
+from core.embeddings import EmbeddingManager
+
+# Import API routes
+from api.auth_routes import router as auth_router
+from api.workflow_routes import router as workflow_router
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+# Global instances
+agent_manager = None
+rag_pipeline = None
+advanced_rag_pipeline = None
+embedding_manager = None
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan manager"""
+    logger.info("Starting Multi-Agent MCP System...")
+    
+    try:
+        # Initialize database
+        await db_manager.initialize()
+        logger.info("Database initialized")
+        
+        # Initialize global instances
+        global agent_manager, rag_pipeline, advanced_rag_pipeline, embedding_manager
+        
+        agent_manager = AgentManager()
+        await agent_manager.initialize()
+        logger.info("Agent Manager initialized")
+        
+        rag_pipeline = RAGPipeline()
+        await rag_pipeline.initialize()
+        logger.info("RAG Pipeline initialized")
+        
+        advanced_rag_pipeline = AdvancedRAGPipeline()
+        await advanced_rag_pipeline.initialize()
+        logger.info("Advanced RAG Pipeline initialized")
+        
+        embedding_manager = EmbeddingManager()
+        await embedding_manager.initialize()
+        logger.info("Embedding Manager initialized")
+        
+        # Initialize workflow engine
+        workflow_engine = get_workflow_engine()
+        logger.info("Workflow Engine initialized")
+        
+        logger.info("🚀 Multi-Agent MCP System started successfully!")
+        
+        yield
+        
+    except Exception as e:
+        logger.error(f"Failed to initialize system: {str(e)}")
+        raise
+    
+    finally:
+        # Cleanup
+        logger.info("Shutting down Multi-Agent MCP System...")
+        
+        try:
+            if agent_manager:
+                await agent_manager.cleanup()
+            if rag_pipeline:
+                await rag_pipeline.cleanup()
+            if advanced_rag_pipeline:
+                await advanced_rag_pipeline.cleanup()
+            if embedding_manager:
+                await embedding_manager.cleanup()
+            
+            workflow_engine = get_workflow_engine()
+            await workflow_engine.cleanup()
+            
+            await db_manager.cleanup()
+            
+            logger.info("System shutdown completed")
+            
+        except Exception as e:
+            logger.error(f"Error during shutdown: {str(e)}")
+
+# Create FastAPI app
 app = FastAPI(
-    title="Multi-Agent MCP",
-    description="AI Knowledge Hub with MCP Agents",
-    version="0.1.0"
+    title="Multi-Agent MCP Enterprise",
+    description="Advanced AI Knowledge Hub with Multi-Agent Orchestration",
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# Security
+security = HTTPBearer()
+
+# Include routers
+app.include_router(auth_router)
+app.include_router(workflow_router)
+
+# Health check endpoints
 @app.get("/")
 async def root():
-    """Health check endpoint"""
+    """Root endpoint with system information"""
     return {
-        "message": "Multi-Agent MCP API",
+        "message": "Multi-Agent MCP Enterprise API",
         "status": "running",
-        "version": "0.1.0"
+        "version": "1.0.0",
+        "timestamp": datetime.utcnow().isoformat(),
+        "features": [
+            "Multi-Agent Orchestration",
+            "Advanced RAG Pipeline", 
+            "Workflow Engine",
+            "User Authentication",
+            "Real-time Monitoring"
+        ]
     }
 
 @app.get("/health")
 async def health_check():
-    """Detailed health check"""
-    return {
-        "status": "healthy",
-        "message": "Backend is running successfully"
-    }
+    """Comprehensive health check"""
+    try:
+        # Check database
+        db_stats = await db_manager.get_system_stats()
+        
+        # Check agents
+        agent_status = await agent_manager.get_system_status() if agent_manager else {"status": "not_initialized"}
+        
+        # Check RAG pipeline
+        rag_status = await rag_pipeline.get_status() if rag_pipeline else {"status": "not_initialized"}
+        
+        # Check advanced RAG
+        advanced_rag_status = await advanced_rag_pipeline.get_status() if advanced_rag_pipeline else {"status": "not_initialized"}
+        
+        # Check workflow engine
+        workflow_engine = get_workflow_engine()
+        workflow_stats = {
+            "active_workflows": len(workflow_engine.active_workflows),
+            "completed_workflows": len(workflow_engine.completed_workflows)
+        }
+        
+        return {
+            "status": "healthy",
+            "timestamp": datetime.utcnow().isoformat(),
+            "components": {
+                "database": "connected",
+                "agents": agent_status.get("total_agents", 0),
+                "rag_pipeline": rag_status.get("status", "unknown"),
+                "advanced_rag": advanced_rag_status.get("status", "unknown"),
+                "workflows": workflow_stats
+            },
+            "statistics": db_stats
+        }
+        
+    except Exception as e:
+        logger.error(f"Health check failed: {str(e)}")
+        raise HTTPException(status_code=503, detail=f"System unhealthy: {str(e)}")
 
 @app.get("/config")
 async def get_config():
     """Get application configuration"""
-    from config import get_config_dict
+    from config import get_config_dict, get_llm_config, get_rag_config, get_agent_config
     
     return {
         "status": "success",
-        "configuration": get_config_dict()
+        "configuration": {
+            "general": get_config_dict(),
+            "llm": get_llm_config(),
+            "rag": get_rag_config(),
+            "agents": get_agent_config()
+        }
     }
 
-@app.get("/test-mcp")
-async def test_mcp():
-    """Test MCP client functionality"""
-    from core.mcp_client import MCPClient
-    
-    client = MCPClient()
-    await client.connect("http://localhost:8001", "test-agent")
-    
-    try:
-        # Test query
-        response = await client.send_query("Hello, test query!")
-        status = await client.get_status()
-        
-        await client.cleanup()
-        
-        return {
-            "test": "MCP Client",
-            "status": "success",
-            "response": response,
-            "client_status": status
-        }
-    except Exception as e:
-        await client.cleanup()
-        return {
-            "test": "MCP Client",
-            "status": "error",
-            "error": str(e)
-        }
-
-@app.get("/test-agent")
-async def test_agent():
-    """Test agent interface functionality"""
-    from core.agent_interface import MockAgent
-    
-    # Create a mock agent
-    agent = MockAgent(
-        agent_id="test-agent-001",
-        name="Test Agent",
-        capabilities=["testing", "mock_responses", "health_check"]
-    )
-    
-    # Activate and test
-    await agent.activate()
-    
-    try:
-        # Test query processing
-        response = await agent.process_query("Hello from test endpoint!")
-        status = agent.get_status()
-        health = await agent.health_check()
-        
-        await agent.deactivate()
-        
-        return {
-            "test": "Agent Interface",
-            "status": "success",
-            "agent_response": response,
-            "agent_status": status,
-            "health_check": health
-        }
-    except Exception as e:
-        await agent.deactivate()
-        return {
-            "test": "Agent Interface",
-            "status": "error",
-            "error": str(e)
-        }
-
-@app.get("/test-registry")
-async def test_registry():
-    """Test agent registry functionality"""
-    from core.agent_registry import AgentRegistry
-    from core.agent_interface import MockAgent
-    
-    # Create registry
-    registry = AgentRegistry()
-    
-    try:
-        # Create and register multiple agents
-        agent1 = MockAgent("docs-agent", "Document Agent", ["document_processing", "qa"])
-        agent2 = MockAgent("code-agent", "Code Agent", ["code_analysis", "refactoring"])
-        
-        # Register agents
-        await registry.register_agent(agent1)
-        await registry.register_agent(agent2)
-        
-        # Test registry functions
-        all_agents = registry.list_agents()
-        registry_status = registry.get_registry_status()
-        health_status = await registry.health_check_all()
-        
-        # Cleanup
-        await registry.unregister_agent("docs-agent")
-        await registry.unregister_agent("code-agent")
-        
-        return {
-            "test": "Agent Registry",
-            "status": "success",
-            "registered_agents": len(all_agents),
-            "registry_status": registry_status,
-            "health_status": health_status
-        }
-    except Exception as e:
-        return {
-            "test": "Agent Registry",
-            "status": "error",
-            "error": str(e)
-        }
-
-@app.get("/test-manager")
-async def test_manager():
-    """Test agent manager functionality"""
-    from core.agent_manager import AgentManager
-    
-    # Create and initialize manager
-    manager = AgentManager()
-    
-    try:
-        await manager.initialize()
-        
-        # Test query routing
-        test_queries = [
-            "Can you analyze this PDF document?",
-            "Help me refactor this Python code",
-            "Search for latest AI news",
-            "Just have a general chat"
-        ]
-        
-        results = []
-        for query in test_queries:
-            try:
-                result = await manager.route_query(query)
-                results.append({
-                    "query": query,
-                    "result": result
-                })
-            except Exception as e:
-                results.append({
-                    "query": query,
-                    "error": str(e)
-                })
-        
-        # Get system status
-        system_status = await manager.get_system_status()
-        
-        # Cleanup
-        await manager.cleanup()
-        
-        return {
-            "test": "Agent Manager",
-            "status": "success",
-            "query_results": results,
-            "system_status": system_status
-        }
-    except Exception as e:
-        try:
-            await manager.cleanup()
-        except:
-            pass
-        
-        return {
-            "test": "Agent Manager",
-            "status": "error",
-            "error": str(e)
-        }
-
+# Legacy endpoints for backward compatibility
 @app.post("/query")
 async def process_query(query: str):
-    """Process a query through the agent system"""
-    from core.agent_manager import AgentManager
-    
-    # For now, create a new manager instance
-    # In production, this would be a singleton
-    manager = AgentManager()
+    """Process a query through the agent system (legacy endpoint)"""
+    if not agent_manager:
+        raise HTTPException(status_code=503, detail="Agent manager not initialized")
     
     try:
-        await manager.initialize()
-        result = await manager.route_query(query)
-        await manager.cleanup()
-        
+        result = await agent_manager.route_query(query)
         return {
             "status": "success",
             "result": result
         }
     except Exception as e:
-        try:
-            await manager.cleanup()
-        except:
-            pass
-        
+        logger.error(f"Query processing failed: {str(e)}")
         return {
             "status": "error",
             "error": str(e)
         }
 
-# RAG Pipeline Endpoints
 @app.post("/rag/upload")
 async def upload_document(filename: str, content: str, content_type: str = "text"):
-    """Upload and process a document for RAG"""
-    from core.rag_pipeline import RAGPipeline
-    
-    rag = RAGPipeline()
+    """Upload and process a document for RAG (legacy endpoint)"""
+    if not advanced_rag_pipeline:
+        raise HTTPException(status_code=503, detail="Advanced RAG pipeline not initialized")
     
     try:
-        await rag.initialize()
-        doc_info = await rag.process_document(filename, content, content_type)
-        await rag.cleanup()
-        
+        doc_info = await advanced_rag_pipeline.process_document(filename, content, content_type)
         return {
             "status": "success",
             "message": "Document processed successfully",
@@ -268,11 +238,7 @@ async def upload_document(filename: str, content: str, content_type: str = "text
             }
         }
     except Exception as e:
-        try:
-            await rag.cleanup()
-        except:
-            pass
-        
+        logger.error(f"Document upload failed: {str(e)}")
         return {
             "status": "error",
             "error": str(e)
@@ -280,16 +246,12 @@ async def upload_document(filename: str, content: str, content_type: str = "text
 
 @app.post("/rag/query")
 async def rag_query(query: str, top_k: int = 5):
-    """Query the RAG system"""
-    from core.rag_pipeline import RAGPipeline
-    
-    rag = RAGPipeline()
+    """Query the RAG system (legacy endpoint)"""
+    if not advanced_rag_pipeline:
+        raise HTTPException(status_code=503, detail="Advanced RAG pipeline not initialized")
     
     try:
-        await rag.initialize()
-        results = await rag.query(query, top_k)
-        await rag.cleanup()
-        
+        results = await advanced_rag_pipeline.query(query, top_k=top_k)
         return {
             "status": "success",
             "query": query,
@@ -297,208 +259,7 @@ async def rag_query(query: str, top_k: int = 5):
             "total_results": len(results)
         }
     except Exception as e:
-        try:
-            await rag.cleanup()
-        except:
-            pass
-        
-        return {
-            "status": "error",
-            "error": str(e)
-        }
-
-@app.get("/rag/status")
-async def rag_status():
-    """Get RAG pipeline status"""
-    from core.rag_pipeline import RAGPipeline
-    
-    rag = RAGPipeline()
-    
-    try:
-        await rag.initialize()
-        status = await rag.get_status()
-        await rag.cleanup()
-        
-        return {
-            "status": "success",
-            "rag_status": status
-        }
-    except Exception as e:
-        try:
-            await rag.cleanup()
-        except:
-            pass
-        
-        return {
-            "status": "error",
-            "error": str(e)
-        }
-
-@app.get("/rag/test")
-async def test_rag():
-    """Test RAG pipeline with sample documents"""
-    from core.rag_pipeline import RAGPipeline
-    
-    rag = RAGPipeline()
-    
-    try:
-        await rag.initialize()
-        
-        # Upload sample documents
-        sample_docs = [
-            {
-                "filename": "sample_ai_article.txt",
-                "content": "Artificial Intelligence is transforming the world. Machine learning algorithms can now process vast amounts of data and make predictions with high accuracy. Deep learning has revolutionized computer vision and natural language processing.",
-                "content_type": "text"
-            },
-            {
-                "filename": "sample_code_guide.md",
-                "content": "# Python Programming Guide\n\n## Variables\nVariables store data in Python.\n\n## Functions\nFunctions are reusable blocks of code.\n\n## Classes\nClasses define object-oriented structures.",
-                "content_type": "markdown"
-            }
-        ]
-        
-        uploaded_docs = []
-        for doc in sample_docs:
-            doc_info = await rag.process_document(doc["filename"], doc["content"], doc["content_type"])
-            uploaded_docs.append(doc_info)
-        
-        # Test queries
-        test_queries = [
-            "What is artificial intelligence?",
-            "How do functions work in Python?",
-            "What are the benefits of machine learning?"
-        ]
-        
-        query_results = []
-        for query in test_queries:
-            results = await rag.query(query, top_k=3)
-            query_results.append({
-                "query": query,
-                "results": results
-            })
-        
-        # Get final status
-        status = await rag.get_status()
-        
-        await rag.cleanup()
-        
-        return {
-            "test": "RAG Pipeline",
-            "status": "success",
-            "uploaded_documents": len(uploaded_docs),
-            "test_queries": query_results,
-            "pipeline_status": status
-        }
-        
-    except Exception as e:
-        try:
-            await rag.cleanup()
-        except:
-            pass
-        
-        return {
-            "test": "RAG Pipeline",
-            "status": "error",
-            "error": str(e)
-        }
-
-@app.get("/embeddings/providers")
-async def get_embedding_providers():
-    """Get available embedding providers"""
-    from core.embeddings import EmbeddingManager
-    
-    manager = EmbeddingManager()
-    
-    try:
-        await manager.initialize()
-        providers = manager.get_available_providers()
-        
-        provider_info = {}
-        for provider in providers:
-            provider_info[provider] = manager.get_provider_info(provider)
-        
-        await manager.cleanup()
-        
-        return {
-            "status": "success",
-            "available_providers": providers,
-            "provider_details": provider_info,
-            "default_provider": manager.default_provider
-        }
-    except Exception as e:
-        try:
-            await manager.cleanup()
-        except:
-            pass
-        
-        return {
-            "status": "error",
-            "error": str(e)
-        }
-
-@app.post("/embeddings/generate")
-async def generate_embeddings(texts: List[str], provider: str = None):
-    """Generate embeddings for texts"""
-    from core.embeddings import EmbeddingManager
-    
-    manager = EmbeddingManager()
-    
-    try:
-        await manager.initialize()
-        result = await manager.generate_embeddings(texts, provider)
-        await manager.cleanup()
-        
-        return {
-            "status": "success",
-            "embeddings_count": len(result.embeddings),
-            "model": result.model,
-            "dimensions": result.dimensions,
-            "tokens_used": result.tokens_used,
-            "cost": result.cost
-        }
-    except Exception as e:
-        try:
-            await manager.cleanup()
-        except:
-            pass
-        
-        return {
-            "status": "error",
-            "error": str(e)
-        }
-
-@app.post("/pdf/process")
-async def process_pdf(filename: str, file_content: bytes):
-    """Process PDF file and extract content"""
-    from core.pdf_processor import PDFProcessor
-    
-    processor = PDFProcessor()
-    
-    try:
-        if not processor.can_process(filename):
-            return {
-                "status": "error",
-                "error": f"File format not supported: {filename}"
-            }
-        
-        pdf_doc = await processor.process_pdf(file_content, filename)
-        
-        # Analyze document structure
-        analysis = processor.analyze_document_structure(pdf_doc)
-        
-        return {
-            "status": "success",
-            "filename": filename,
-            "total_pages": pdf_doc.total_pages,
-            "total_characters": len(pdf_doc.text_content),
-            "total_words": len(pdf_doc.text_content.split()),
-            "tables_found": len(pdf_doc.extracted_tables),
-            "images_found": len(pdf_doc.extracted_images),
-            "document_analysis": analysis,
-            "metadata": pdf_doc.metadata
-        }
-    except Exception as e:
+        logger.error(f"RAG query failed: {str(e)}")
         return {
             "status": "error",
             "error": str(e)
@@ -506,36 +267,26 @@ async def process_pdf(filename: str, file_content: bytes):
 
 @app.get("/system/status")
 async def get_system_status():
-    """Get comprehensive system status"""
-    from core.agent_manager import AgentManager
-    from core.rag_pipeline import RAGPipeline
-    from core.embeddings import EmbeddingManager
-    
+    """Get comprehensive system status (legacy endpoint)"""
     try:
         # Get agent manager status
-        agent_manager = AgentManager()
-        await agent_manager.initialize()
-        agent_status = await agent_manager.get_system_status()
-        await agent_manager.cleanup()
+        agent_status = await agent_manager.get_system_status() if agent_manager else {}
         
         # Get RAG pipeline status
-        rag = RAGPipeline()
-        await rag.initialize()
-        rag_status = await rag.get_status()
-        await rag.cleanup()
+        rag_status = await advanced_rag_pipeline.get_status() if advanced_rag_pipeline else {}
         
         # Get embedding manager status
-        embedding_manager = EmbeddingManager()
-        await embedding_manager.initialize()
-        embedding_providers = embedding_manager.get_available_providers()
-        await embedding_manager.cleanup()
+        embedding_providers = embedding_manager.get_available_providers() if embedding_manager else []
+        
+        # Get database stats
+        db_stats = await db_manager.get_system_stats()
         
         return {
             "status": "success",
             "timestamp": datetime.utcnow().isoformat(),
             "system": {
-                "name": "Multi-Agent MCP",
-                "version": "0.1.0",
+                "name": "Multi-Agent MCP Enterprise",
+                "version": "1.0.0",
                 "status": "running"
             },
             "agents": agent_status,
@@ -543,10 +294,114 @@ async def get_system_status():
             "embeddings": {
                 "available_providers": embedding_providers,
                 "status": "initialized"
-            }
+            },
+            "database": db_stats
         }
     except Exception as e:
+        logger.error(f"System status check failed: {str(e)}")
         return {
+            "status": "error",
+            "error": str(e)
+        }
+
+# Test endpoints
+@app.get("/test/agents")
+async def test_agents():
+    """Test agent functionality"""
+    if not agent_manager:
+        raise HTTPException(status_code=503, detail="Agent manager not initialized")
+    
+    try:
+        test_queries = [
+            "Can you analyze this document?",
+            "Help me debug this code",
+            "Search for AI news",
+            "Hello, how are you?"
+        ]
+        
+        results = []
+        for query in test_queries:
+            try:
+                result = await agent_manager.route_query(query)
+                results.append({
+                    "query": query,
+                    "result": result
+                })
+            except Exception as e:
+                results.append({
+                    "query": query,
+                    "error": str(e)
+                })
+        
+        return {
+            "test": "Agent System",
+            "status": "success",
+            "results": results
+        }
+        
+    except Exception as e:
+        logger.error(f"Agent test failed: {str(e)}")
+        return {
+            "test": "Agent System",
+            "status": "error",
+            "error": str(e)
+        }
+
+@app.get("/test/rag")
+async def test_rag():
+    """Test RAG pipeline functionality"""
+    if not advanced_rag_pipeline:
+        raise HTTPException(status_code=503, detail="Advanced RAG pipeline not initialized")
+    
+    try:
+        # Upload sample document
+        sample_content = """
+        Artificial Intelligence (AI) is transforming the world in unprecedented ways. 
+        Machine learning algorithms can now process vast amounts of data and make 
+        predictions with remarkable accuracy. Deep learning has revolutionized 
+        computer vision, natural language processing, and many other fields.
+        
+        Multi-agent systems represent the next frontier in AI development, where 
+        multiple AI agents collaborate to solve complex problems that would be 
+        difficult for a single agent to handle alone.
+        """
+        
+        doc_info = await advanced_rag_pipeline.process_document(
+            "sample_ai_article.txt", 
+            sample_content, 
+            "text"
+        )
+        
+        # Test queries
+        test_queries = [
+            "What is artificial intelligence?",
+            "How do multi-agent systems work?",
+            "What are the applications of deep learning?"
+        ]
+        
+        query_results = []
+        for query in test_queries:
+            results = await advanced_rag_pipeline.query(query, top_k=3)
+            query_results.append({
+                "query": query,
+                "results": results
+            })
+        
+        return {
+            "test": "Advanced RAG Pipeline",
+            "status": "success",
+            "document_processed": {
+                "id": doc_info.id,
+                "filename": doc_info.filename,
+                "chunks": doc_info.chunk_count
+            },
+            "query_results": query_results
+        }
+        
+    except Exception as e:
+        logger.error(f"RAG test failed: {str(e)}")
+        return {
+            "test": "Advanced RAG Pipeline",
             "status": "error",
             "error": str(e)
         }
