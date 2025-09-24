@@ -10,7 +10,9 @@ import {
   Settings,
   GitBranch,
   Brain,
-  Activity
+  Activity,
+  Network,
+  Target
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { DocumentUpload } from '@/components/DocumentUpload'
@@ -22,6 +24,8 @@ import { WorkflowBuilder } from '@/components/WorkflowBuilder'
 import { LoginForm } from '@/components/LoginForm'
 import { RealTimeMonitor } from '@/components/RealTimeMonitor'
 import { AIReasoningViewer } from '@/components/AIReasoningViewer'
+import { KnowledgeGraphViewer } from '@/components/KnowledgeGraphViewer'
+import { AdaptiveLearningDashboard } from '@/components/AdaptiveLearningDashboard'
 
 const agents = [
   {
@@ -67,6 +71,8 @@ const tabs = [
   { id: 'documents', name: 'Documents', icon: FileText },
   { id: 'workflows', name: 'Workflows', icon: GitBranch },
   { id: 'ai-reasoning', name: 'AI Reasoning', icon: Brain },
+  { id: 'knowledge-graph', name: 'Knowledge Graph', icon: Network },
+  { id: 'adaptive-learning', name: 'Adaptive Learning', icon: Target },
   { id: 'real-time', name: 'Real-Time', icon: Activity },
   { id: 'metrics', name: 'Metrics', icon: BarChart3 },
   { id: 'agents', name: 'Agents', icon: Bot },
@@ -109,6 +115,10 @@ export default function Home() {
         return <WorkflowBuilder />
       case 'ai-reasoning':
         return <AIReasoningViewer />
+      case 'knowledge-graph':
+        return <KnowledgeGraphViewer />
+      case 'adaptive-learning':
+        return <AdaptiveLearningDashboard />
       case 'real-time':
         return <RealTimeMonitor />
       case 'metrics':

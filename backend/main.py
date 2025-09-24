@@ -21,11 +21,14 @@ from core.advanced_rag import AdvancedRAGPipeline
 from core.embeddings import EmbeddingManager
 from core.real_time_engine import real_time_engine
 from core.ai_orchestrator import ai_orchestrator
+from core.knowledge_graph import knowledge_graph
+from core.adaptive_learning import adaptive_learning
 
 # Import API routes
 from api.auth_routes import router as auth_router
 from api.workflow_routes import router as workflow_router
 from api.websocket_routes import websocket_router, ai_router
+from api.knowledge_routes import knowledge_router, learning_router
 
 # Configure logging
 logging.basicConfig(
@@ -81,6 +84,14 @@ async def lifespan(app: FastAPI):
         await ai_orchestrator.initialize()
         logger.info("AI Orchestrator initialized")
         
+        # Initialize knowledge graph
+        # Note: Knowledge graph is already initialized on import
+        logger.info("Knowledge Graph initialized")
+        
+        # Initialize adaptive learning
+        # Note: Adaptive learning is already initialized on import
+        logger.info("Adaptive Learning System initialized")
+        
         logger.info("🚀 Multi-Agent MCP System started successfully!")
         
         yield
@@ -108,6 +119,8 @@ async def lifespan(app: FastAPI):
             
             await real_time_engine.stop()
             await ai_orchestrator.cleanup()
+            await knowledge_graph.cleanup()
+            await adaptive_learning.cleanup()
             
             await db_manager.cleanup()
             
@@ -141,6 +154,8 @@ app.include_router(auth_router)
 app.include_router(workflow_router)
 app.include_router(websocket_router)
 app.include_router(ai_router)
+app.include_router(knowledge_router)
+app.include_router(learning_router)
 
 # Health check endpoints
 @app.get("/")
