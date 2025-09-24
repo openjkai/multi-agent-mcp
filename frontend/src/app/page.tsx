@@ -3,26 +3,25 @@
 import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { 
-  Brain, 
+  MessageSquare, 
   FileText, 
-  Code, 
-  Globe, 
-  MessageCircle, 
-  Upload,
-  Search,
-  Activity,
-  Zap,
-  BarChart3,
-  Eye,
-  Settings
+  BarChart3, 
+  Bot, 
+  Settings,
+  GitBranch,
+  Brain,
+  Activity
 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { AgentCard } from '@/components/AgentCard'
-import { QueryInterface } from '@/components/QueryInterface'
-import { SystemStatus } from '@/components/SystemStatus'
 import { DocumentUpload } from '@/components/DocumentUpload'
-import { AgentMetrics } from '@/components/AgentMetrics'
+import { QueryInterface } from '@/components/QueryInterface'
 import { DocumentViewer } from '@/components/DocumentViewer'
+import { AgentCard } from '@/components/AgentCard'
+import { AgentMetrics } from '@/components/AgentMetrics'
+import { WorkflowBuilder } from '@/components/WorkflowBuilder'
+import { LoginForm } from '@/components/LoginForm'
+import { RealTimeMonitor } from '@/components/RealTimeMonitor'
+import { AIReasoningViewer } from '@/components/AIReasoningViewer'
 
 const agents = [
   {
@@ -64,10 +63,13 @@ const agents = [
 ]
 
 const tabs = [
-  { id: 'chat', name: 'Chat', icon: MessageCircle, description: 'Interact with AI agents' },
-  { id: 'documents', name: 'Documents', icon: FileText, description: 'Manage your document library' },
-  { id: 'metrics', name: 'Metrics', icon: BarChart3, description: 'Monitor agent performance' },
-  { id: 'agents', name: 'Agents', icon: Zap, description: 'View available agents' }
+  { id: 'chat', name: 'Chat', icon: MessageSquare },
+  { id: 'documents', name: 'Documents', icon: FileText },
+  { id: 'workflows', name: 'Workflows', icon: GitBranch },
+  { id: 'ai-reasoning', name: 'AI Reasoning', icon: Brain },
+  { id: 'real-time', name: 'Real-Time', icon: Activity },
+  { id: 'metrics', name: 'Metrics', icon: BarChart3 },
+  { id: 'agents', name: 'Agents', icon: Bot },
 ]
 
 export default function Home() {
@@ -95,113 +97,32 @@ export default function Home() {
   const renderTabContent = () => {
     switch (activeTab) {
       case 'chat':
-        return (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Query Interface */}
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.6 }}
-              className="lg:col-span-2"
-            >
-              <QueryInterface />
-            </motion.div>
-
-            {/* Document Upload */}
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.6, delay: 0.1 }}
-            >
-              <DocumentUpload />
-            </motion.div>
-          </div>
-        )
-      
+        return <QueryInterface />
       case 'documents':
         return (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-          >
+          <div className="space-y-6">
+            <DocumentUpload />
             <DocumentViewer />
-          </motion.div>
+          </div>
         )
-      
+      case 'workflows':
+        return <WorkflowBuilder />
+      case 'ai-reasoning':
+        return <AIReasoningViewer />
+      case 'real-time':
+        return <RealTimeMonitor />
       case 'metrics':
-        return (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-          >
-            <AgentMetrics />
-          </motion.div>
-        )
-      
+        return <AgentMetrics />
       case 'agents':
         return (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-          >
-            <div className="mb-8">
-              <h3 className="text-2xl font-bold text-gray-900 mb-4 flex items-center">
-                <Zap className="h-6 w-6 mr-2 text-primary-600" />
-                Available Agents
-              </h3>
-              <p className="text-gray-600">
-                Specialized AI agents ready to assist with your tasks
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {agents.map((agent, index) => (
-                <motion.div
-                  key={agent.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.6, delay: index * 0.1 }}
-                >
-                  <AgentCard agent={agent} />
-                </motion.div>
-              ))}
-            </div>
-
-            {/* Agent Status Summary */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.4 }}
-              className="mt-8"
-            >
-              <div className="card">
-                <h4 className="text-lg font-semibold text-gray-900 mb-4">Agent Status Summary</h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-green-600">{agents.length}</div>
-                    <div className="text-sm text-gray-600">Total Agents</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-blue-600">{agents.length}</div>
-                    <div className="text-sm text-gray-600">Active Agents</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-purple-600">
-                      {agents.reduce((acc, agent) => acc + agent.capabilities.length, 0)}
-                    </div>
-                    <div className="text-sm text-gray-600">Total Capabilities</div>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          </motion.div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {agents.map((agent) => (
+              <AgentCard key={agent.id} agent={agent} />
+            ))}
+          </div>
         )
-      
       default:
-        return null
+        return <QueryInterface />
     }
   }
 

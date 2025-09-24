@@ -19,10 +19,13 @@ from core.agent_manager import AgentManager
 from core.rag_pipeline import RAGPipeline
 from core.advanced_rag import AdvancedRAGPipeline
 from core.embeddings import EmbeddingManager
+from core.real_time_engine import real_time_engine
+from core.ai_orchestrator import ai_orchestrator
 
 # Import API routes
 from api.auth_routes import router as auth_router
 from api.workflow_routes import router as workflow_router
+from api.websocket_routes import websocket_router, ai_router
 
 # Configure logging
 logging.basicConfig(
@@ -70,6 +73,14 @@ async def lifespan(app: FastAPI):
         workflow_engine = get_workflow_engine()
         logger.info("Workflow Engine initialized")
         
+        # Initialize real-time engine
+        await real_time_engine.start()
+        logger.info("Real-Time Engine initialized")
+        
+        # Initialize AI orchestrator
+        await ai_orchestrator.initialize()
+        logger.info("AI Orchestrator initialized")
+        
         logger.info("🚀 Multi-Agent MCP System started successfully!")
         
         yield
@@ -94,6 +105,9 @@ async def lifespan(app: FastAPI):
             
             workflow_engine = get_workflow_engine()
             await workflow_engine.cleanup()
+            
+            await real_time_engine.stop()
+            await ai_orchestrator.cleanup()
             
             await db_manager.cleanup()
             
@@ -125,6 +139,8 @@ security = HTTPBearer()
 # Include routers
 app.include_router(auth_router)
 app.include_router(workflow_router)
+app.include_router(websocket_router)
+app.include_router(ai_router)
 
 # Health check endpoints
 @app.get("/")
