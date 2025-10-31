@@ -12,7 +12,8 @@ import {
   Brain,
   Activity,
   Network,
-  Target
+  Target,
+  Zap
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { DocumentUpload } from '@/components/DocumentUpload'
@@ -26,6 +27,9 @@ import { RealTimeMonitor } from '@/components/RealTimeMonitor'
 import { AIReasoningViewer } from '@/components/AIReasoningViewer'
 import { KnowledgeGraphViewer } from '@/components/KnowledgeGraphViewer'
 import { AdaptiveLearningDashboard } from '@/components/AdaptiveLearningDashboard'
+import { QuantumOptimizationDashboard } from '@/components/QuantumOptimizationDashboard'
+import { CognitiveWorkloadMonitor } from '@/components/CognitiveWorkloadMonitor'
+import { SystemStatus } from '@/components/SystemStatus'
 
 const agents = [
   {
@@ -73,7 +77,9 @@ const tabs = [
   { id: 'ai-reasoning', name: 'AI Reasoning', icon: Brain },
   { id: 'knowledge-graph', name: 'Knowledge Graph', icon: Network },
   { id: 'adaptive-learning', name: 'Adaptive Learning', icon: Target },
-  { id: 'real-time', name: 'Real-Time', icon: Activity },
+  { id: 'quantum-optimization', name: 'Quantum Optimization', icon: Zap },
+  { id: 'cognitive-workload', name: 'Cognitive Workload', icon: Activity },
+  { id: 'real-time', name: 'Real-Time', icon: Settings },
   { id: 'metrics', name: 'Metrics', icon: BarChart3 },
   { id: 'agents', name: 'Agents', icon: Bot },
 ]
@@ -119,6 +125,10 @@ export default function Home() {
         return <KnowledgeGraphViewer />
       case 'adaptive-learning':
         return <AdaptiveLearningDashboard />
+      case 'quantum-optimization':
+        return <QuantumOptimizationDashboard />
+      case 'cognitive-workload':
+        return <CognitiveWorkloadMonitor />
       case 'real-time':
         return <RealTimeMonitor />
       case 'metrics':

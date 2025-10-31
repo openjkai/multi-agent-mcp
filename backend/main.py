@@ -23,12 +23,17 @@ from core.real_time_engine import real_time_engine
 from core.ai_orchestrator import ai_orchestrator
 from core.knowledge_graph import knowledge_graph
 from core.adaptive_learning import adaptive_learning
+from core.quantum_optimization import quantum_optimizer
+from core.neural_architecture import neural_architecture_search
+from core.cognitive_workload import cognitive_workload_manager
+from core.predictive_analytics import predictive_analytics
 
 # Import API routes
 from api.auth_routes import router as auth_router
 from api.workflow_routes import router as workflow_router
 from api.websocket_routes import websocket_router, ai_router
 from api.knowledge_routes import knowledge_router, learning_router
+from api.advanced_routes import quantum_router, nas_router, cognitive_router, predictive_router
 
 # Configure logging
 logging.basicConfig(
@@ -92,6 +97,22 @@ async def lifespan(app: FastAPI):
         # Note: Adaptive learning is already initialized on import
         logger.info("Adaptive Learning System initialized")
         
+        # Initialize quantum optimization
+        # Note: Quantum optimizer is already initialized on import
+        logger.info("Quantum Optimization Engine initialized")
+        
+        # Initialize neural architecture search
+        # Note: NAS is already initialized on import
+        logger.info("Neural Architecture Search initialized")
+        
+        # Initialize cognitive workload manager
+        # Note: Cognitive workload manager is already initialized on import
+        logger.info("Cognitive Workload Manager initialized")
+        
+        # Initialize predictive analytics
+        # Note: Predictive analytics is already initialized on import
+        logger.info("Predictive Analytics Engine initialized")
+        
         logger.info("🚀 Multi-Agent MCP System started successfully!")
         
         yield
@@ -121,6 +142,10 @@ async def lifespan(app: FastAPI):
             await ai_orchestrator.cleanup()
             await knowledge_graph.cleanup()
             await adaptive_learning.cleanup()
+            await quantum_optimizer.cleanup()
+            await neural_architecture_search.cleanup()
+            await cognitive_workload_manager.cleanup()
+            await predictive_analytics.cleanup()
             
             await db_manager.cleanup()
             
@@ -156,6 +181,10 @@ app.include_router(websocket_router)
 app.include_router(ai_router)
 app.include_router(knowledge_router)
 app.include_router(learning_router)
+app.include_router(quantum_router)
+app.include_router(nas_router)
+app.include_router(cognitive_router)
+app.include_router(predictive_router)
 
 # Health check endpoints
 @app.get("/")
