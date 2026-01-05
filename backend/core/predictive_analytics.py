@@ -37,6 +37,7 @@ class PredictionType(Enum):
 class ModelType(Enum):
     """Types of prediction models"""
     LINEAR_REGRESSION = "linear_regression"
+    RIDGE = "ridge"
     RANDOM_FOREST = "random_forest"
     GRADIENT_BOOSTING = "gradient_boosting"
     NEURAL_NETWORK = "neural_network"
@@ -240,6 +241,9 @@ class PredictiveAnalyticsEngine:
     
     async def _train_model(self, request: PredictionRequest, X: np.ndarray, y: np.ndarray) -> Any:
         """Train a prediction model"""
+        # Create model key
+        model_key = f"{request.prediction_type.value}_{request.model_type.value}"
+        
         if request.model_type == ModelType.LINEAR_REGRESSION:
             model = LinearRegression()
         elif request.model_type == ModelType.RANDOM_FOREST:

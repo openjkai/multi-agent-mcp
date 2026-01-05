@@ -119,8 +119,8 @@ class EntityExtractor:
         }
         
         self.relation_patterns = {
-            RelationType.USES: [r'uses?', r'utilizes?', r'employs?', r'leverages?'],
-            RelationType.CREATES: [r'creates?', r'generates?', r'produces?', r'builds?'],
+            RelationType.USED_BY: [r'uses?', r'utilizes?', r'employs?', r'leverages?'],
+            RelationType.CREATED_BY: [r'creates?', r'generates?', r'produces?', r'builds?'],
             RelationType.DEPENDS_ON: [r'depends on', r'requires?', r'needs?', r'relies on'],
             RelationType.ENABLES: [r'enables?', r'allows?', r'facilitates?', r'supports?'],
         }
