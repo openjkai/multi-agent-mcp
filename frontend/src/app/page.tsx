@@ -13,7 +13,10 @@ import {
   Activity,
   Network,
   Target,
-  Zap
+  Zap,
+  Code,
+  Globe,
+  MessageCircle
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { DocumentUpload } from '@/components/DocumentUpload'
@@ -158,7 +161,7 @@ export default function Home() {
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">Multi-Agent MCP</h1>
-                <p className="text-sm text-gray-600">AI Knowledge Hub v0.2.0</p>
+                <p className="text-sm text-gray-600">AI Knowledge Hub v1.3.0 - Complete Integration Edition</p>
               </div>
             </div>
             <div className="flex items-center space-x-4">
@@ -183,8 +186,8 @@ export default function Home() {
             Intelligent Multi-Agent System
           </h2>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Harness the power of AI agents working together through MCP protocol, 
-            enhanced with RAG capabilities and real-time collaboration.
+            Enterprise-grade AI collaboration platform with Quantum Optimization, Neural Architecture Search, 
+            Cognitive Workload Management, Predictive Analytics, Knowledge Graph, and Adaptive Learning.
           </p>
         </motion.div>
 
@@ -229,12 +232,6 @@ export default function Home() {
             </nav>
           </div>
           
-          {/* Tab Description */}
-          <div className="mt-4">
-            <p className="text-gray-600">
-              {tabs.find(tab => tab.id === activeTab)?.description}
-            </p>
-          </div>
         </motion.div>
 
         {/* Tab Content */}

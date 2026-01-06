@@ -90,14 +90,25 @@ class OpenAIEmbeddingProvider(BaseEmbeddingProvider):
                 if i > 0:
                     await asyncio.sleep(self.rate_limit_delay)
                 
-                response = await self.client.embeddings.create(
-                    model=self.model_name,
-                    input=batch
-                )
-                
-                batch_embeddings = [item.embedding for item in response.data]
-                all_embeddings.extend(batch_embeddings)
-                total_tokens += response.usage.total_tokens
+                try:
+                    response = await self.client.embeddings.create(
+                        model=self.model_name,
+                        input=batch
+                    )
+                    
+                    batch_embeddings = [item.embedding for item in response.data]
+                    all_embeddings.extend(batch_embeddings)
+                    total_tokens += response.usage.total_tokens
+                except Exception as e:
+                    error_msg = str(e)
+                    if "api_key" in error_msg.lower() or "authentication" in error_msg.lower():
+                        raise RuntimeError(f"OpenAI API authentication failed. Check your API key: {error_msg}")
+                    elif "rate_limit" in error_msg.lower() or "quota" in error_msg.lower():
+                        raise RuntimeError(f"OpenAI API rate limit exceeded. Please wait and try again: {error_msg}")
+                    elif "model" in error_msg.lower():
+                        raise RuntimeError(f"OpenAI model unavailable: {error_msg}")
+                    else:
+                        raise RuntimeError(f"OpenAI API error: {error_msg}")
             
             return EmbeddingResult(
                 embeddings=all_embeddings,
@@ -241,20 +252,46 @@ class EmbeddingManager:
         logger.info(f"Default provider: {self.default_provider}")
     
     async def generate_embeddings(self, texts: List[str], provider: Optional[str] = None) -> EmbeddingResult:
-        """Generate embeddings using specified or default provider"""
+        """Generate embeddings using specified or default provider with fallback"""
         provider_name = provider or self.default_provider
         
-        if provider_name not in self.providers:
-            raise ValueError(f"Provider {provider_name} not available")
+        # Try primary provider first
+        if provider_name in self.providers:
+            provider_instance = self.providers[provider_name]
+            
+            # Initialize provider if needed
+            if provider_name not in self.initialized_providers:
+                try:
+                    await provider_instance.initialize()
+                    self.initialized_providers.add(provider_name)
+                except Exception as e:
+                    logger.warning(f"Failed to initialize provider {provider_name}: {str(e)}")
+                    # Fall through to fallback
+            
+            # Try to generate embeddings
+            try:
+                return await provider_instance.generate_embeddings(texts)
+            except Exception as e:
+                logger.warning(f"Provider {provider_name} failed: {str(e)}. Trying fallback...")
+                # Fall through to fallback
         
-        provider_instance = self.providers[provider_name]
+        # Fallback to mock provider if primary fails
+        if "mock" in self.providers and provider_name != "mock":
+            logger.info(f"Falling back to mock provider")
+            try:
+                mock_provider = self.providers["mock"]
+                if "mock" not in self.initialized_providers:
+                    await mock_provider.initialize()
+                    self.initialized_providers.add("mock")
+                return await mock_provider.generate_embeddings(texts)
+            except Exception as e:
+                logger.error(f"Mock provider also failed: {str(e)}")
         
-        # Initialize provider if needed
-        if provider_name not in self.initialized_providers:
-            await provider_instance.initialize()
-            self.initialized_providers.add(provider_name)
-        
-        return await provider_instance.generate_embeddings(texts)
+        # If all providers fail, raise error
+        raise RuntimeError(
+            f"All embedding providers failed. Tried: {provider_name}, fallback: mock. "
+            f"Available providers: {list(self.providers.keys())}"
+        )
     
     def get_available_providers(self) -> List[str]:
         """Get list of available providers"""

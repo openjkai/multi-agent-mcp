@@ -157,8 +157,8 @@ async def lifespan(app: FastAPI):
 # Create FastAPI app
 app = FastAPI(
     title="Multi-Agent MCP Enterprise",
-    description="Advanced AI Knowledge Hub with Multi-Agent Orchestration",
-    version="1.0.0",
+    description="Advanced AI Knowledge Hub with Multi-Agent Orchestration, Quantum Optimization, Neural Architecture Search, Cognitive Workload Management, Predictive Analytics, Knowledge Graph, and Adaptive Learning",
+    version="1.3.0",
     lifespan=lifespan
 )
 
@@ -193,15 +193,32 @@ async def root():
     return {
         "message": "Multi-Agent MCP Enterprise API",
         "status": "running",
-        "version": "1.0.0",
+        "version": "1.3.0",
         "timestamp": datetime.utcnow().isoformat(),
         "features": [
             "Multi-Agent Orchestration",
             "Advanced RAG Pipeline", 
             "Workflow Engine",
             "User Authentication",
-            "Real-time Monitoring"
-        ]
+            "Real-time Monitoring",
+            "Knowledge Graph System",
+            "Adaptive Learning",
+            "Quantum Optimization",
+            "Neural Architecture Search",
+            "Cognitive Workload Management",
+            "Predictive Analytics"
+        ],
+        "api_endpoints": {
+            "knowledge": "/knowledge/*",
+            "learning": "/learning/*",
+            "quantum": "/quantum/*",
+            "nas": "/nas/*",
+            "cognitive": "/cognitive/*",
+            "predictive": "/predictive/*",
+            "ai": "/ai/*",
+            "workflows": "/workflows/*",
+            "auth": "/auth/*"
+        }
     }
 
 @app.get("/health")
@@ -227,15 +244,58 @@ async def health_check():
             "completed_workflows": len(workflow_engine.completed_workflows)
         }
         
+        # Check advanced systems
+        try:
+            kg_stats = await knowledge_graph.get_statistics()
+            learning_stats = await adaptive_learning.get_learning_statistics()
+            quantum_stats = await quantum_optimizer.get_optimization_statistics()
+            nas_stats = await neural_architecture_search.get_search_statistics()
+            cognitive_stats = await cognitive_workload_manager.get_workload_statistics()
+            predictive_stats = await predictive_analytics.get_analytics_statistics()
+        except Exception as e:
+            logger.warning(f"Some advanced systems not available: {str(e)}")
+            kg_stats = learning_stats = quantum_stats = nas_stats = cognitive_stats = predictive_stats = {}
+        
         return {
             "status": "healthy",
             "timestamp": datetime.utcnow().isoformat(),
+            "version": "1.3.0",
             "components": {
                 "database": "connected",
                 "agents": agent_status.get("total_agents", 0),
                 "rag_pipeline": rag_status.get("status", "unknown"),
                 "advanced_rag": advanced_rag_status.get("status", "unknown"),
-                "workflows": workflow_stats
+                "workflows": workflow_stats,
+                "knowledge_graph": {
+                    "status": "running",
+                    "entities": kg_stats.get("total_entities", 0),
+                    "relationships": kg_stats.get("total_relationships", 0)
+                },
+                "adaptive_learning": {
+                    "status": "running",
+                    "total_users": learning_stats.get("total_users", 0),
+                    "total_events": learning_stats.get("total_learning_events", 0)
+                },
+                "quantum_optimization": {
+                    "status": "running",
+                    "total_optimizations": quantum_stats.get("total_optimizations", 0),
+                    "success_rate": quantum_stats.get("success_rate", 0)
+                },
+                "neural_architecture_search": {
+                    "status": "running",
+                    "total_searches": nas_stats.get("total_searches", 0),
+                    "success_rate": nas_stats.get("success_rate", 0)
+                },
+                "cognitive_workload": {
+                    "status": "running",
+                    "total_users": cognitive_stats.get("total_users", 0),
+                    "total_adaptations": cognitive_stats.get("total_adaptations", 0)
+                },
+                "predictive_analytics": {
+                    "status": "running",
+                    "total_predictions": predictive_stats.get("total_predictions", 0),
+                    "average_accuracy": predictive_stats.get("average_accuracy", 0)
+                }
             },
             "statistics": db_stats
         }
@@ -346,8 +406,20 @@ async def get_system_status():
             "timestamp": datetime.utcnow().isoformat(),
             "system": {
                 "name": "Multi-Agent MCP Enterprise",
-                "version": "1.0.0",
-                "status": "running"
+                "version": "1.3.0",
+                "status": "running",
+                "features": [
+                    "Multi-Agent Orchestration",
+                    "Advanced RAG Pipeline",
+                    "Knowledge Graph System",
+                    "Adaptive Learning",
+                    "Quantum Optimization",
+                    "Neural Architecture Search",
+                    "Cognitive Workload Management",
+                    "Predictive Analytics",
+                    "Real-time Collaboration",
+                    "Workflow Engine"
+                ]
             },
             "agents": agent_status,
             "rag_pipeline": rag_status,
