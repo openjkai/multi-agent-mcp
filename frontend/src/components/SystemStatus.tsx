@@ -123,7 +123,7 @@ export function SystemStatus({ status, isLoading }: SystemStatusProps) {
       <div className="mt-4 pt-4 border-t border-gray-200">
         <div className="flex items-center justify-between text-sm text-gray-600">
           <span>Last Updated: {new Date().toLocaleTimeString()}</span>
-          <span>Version: {status.system?.version || '0.1.0'}</span>
+          <span>Version: {status.system?.version || '1.3.0'}</span>
         </div>
       </div>
     </div>
