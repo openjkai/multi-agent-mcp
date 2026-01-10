@@ -27,6 +27,10 @@ from core.quantum_optimization import quantum_optimizer
 from core.neural_architecture import neural_architecture_search
 from core.cognitive_workload import cognitive_workload_manager
 from core.predictive_analytics import predictive_analytics
+from core.cache import cache_manager
+from core.rate_limiter import rate_limiter
+from middleware.monitoring import MonitoringMiddleware, PerformanceMiddleware, metrics_collector
+from middleware.rate_limit_middleware import RateLimitMiddleware
 
 # Import API routes
 from api.auth_routes import router as auth_router
@@ -34,6 +38,8 @@ from api.workflow_routes import router as workflow_router
 from api.websocket_routes import websocket_router, ai_router
 from api.knowledge_routes import knowledge_router, learning_router
 from api.advanced_routes import quantum_router, nas_router, cognitive_router, predictive_router
+from api.batch_routes import batch_router
+from api.system_routes import system_router
 
 # Configure logging
 logging.basicConfig(
@@ -47,6 +53,19 @@ agent_manager = None
 rag_pipeline = None
 advanced_rag_pipeline = None
 embedding_manager = None
+
+def _cache_cleanup_task():
+    """Background task for periodic cache cleanup"""
+    import asyncio
+    async def cleanup_loop():
+        while True:
+            try:
+                await asyncio.sleep(300)  # Every 5 minutes
+                await cache_manager.cleanup_expired()
+            except Exception as e:
+                logger.error(f"Cache cleanup task error: {str(e)}")
+                await asyncio.sleep(60)
+    return cleanup_loop
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -113,9 +132,21 @@ async def lifespan(app: FastAPI):
         # Note: Predictive analytics is already initialized on import
         logger.info("Predictive Analytics Engine initialized")
         
+        # Start cache cleanup background task
+        import asyncio
+        cleanup_task = asyncio.create_task(_cache_cleanup_task()())
+        logger.info("Cache Manager initialized with cleanup task")
+        
         logger.info("🚀 Multi-Agent MCP System started successfully!")
         
         yield
+        
+        # Cancel cleanup task on shutdown
+        cleanup_task.cancel()
+        try:
+            await cleanup_task
+        except asyncio.CancelledError:
+            pass
         
     except Exception as e:
         logger.error(f"Failed to initialize system: {str(e)}")
@@ -149,6 +180,10 @@ async def lifespan(app: FastAPI):
             
             await db_manager.cleanup()
             
+            # Clear cache on shutdown
+            await cache_manager.clear()
+            logger.info("Cache cleared on shutdown")
+            
             logger.info("System shutdown completed")
             
         except Exception as e:
@@ -158,7 +193,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Multi-Agent MCP Enterprise",
     description="Advanced AI Knowledge Hub with Multi-Agent Orchestration, Quantum Optimization, Neural Architecture Search, Cognitive Workload Management, Predictive Analytics, Knowledge Graph, and Adaptive Learning",
-    version="1.3.0",
+    version="1.4.0",
     lifespan=lifespan
 )
 
@@ -170,6 +205,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Monitoring, performance, and rate limiting middleware
+# Order matters: RateLimit -> Performance -> Monitoring
+app.add_middleware(RateLimitMiddleware)
+app.add_middleware(PerformanceMiddleware)
+app.add_middleware(MonitoringMiddleware)
 
 # Security
 security = HTTPBearer()
@@ -185,6 +226,8 @@ app.include_router(quantum_router)
 app.include_router(nas_router)
 app.include_router(cognitive_router)
 app.include_router(predictive_router)
+app.include_router(batch_router)
+app.include_router(system_router)
 
 # Health check endpoints
 @app.get("/")
@@ -193,7 +236,7 @@ async def root():
     return {
         "message": "Multi-Agent MCP Enterprise API",
         "status": "running",
-        "version": "1.3.0",
+        "version": "1.4.0",
         "timestamp": datetime.utcnow().isoformat(),
         "features": [
             "Multi-Agent Orchestration",
@@ -206,7 +249,11 @@ async def root():
             "Quantum Optimization",
             "Neural Architecture Search",
             "Cognitive Workload Management",
-            "Predictive Analytics"
+            "Predictive Analytics",
+            "Caching Layer",
+            "Rate Limiting",
+            "Batch Operations",
+            "Performance Monitoring"
         ],
         "api_endpoints": {
             "knowledge": "/knowledge/*",
@@ -217,7 +264,9 @@ async def root():
             "predictive": "/predictive/*",
             "ai": "/ai/*",
             "workflows": "/workflows/*",
-            "auth": "/auth/*"
+            "auth": "/auth/*",
+            "batch": "/batch/*",
+            "system": "/system/*"
         }
     }
 
@@ -259,7 +308,7 @@ async def health_check():
         return {
             "status": "healthy",
             "timestamp": datetime.utcnow().isoformat(),
-            "version": "1.3.0",
+            "version": "1.4.0",
             "components": {
                 "database": "connected",
                 "agents": agent_status.get("total_agents", 0),
@@ -406,7 +455,7 @@ async def get_system_status():
             "timestamp": datetime.utcnow().isoformat(),
             "system": {
                 "name": "Multi-Agent MCP Enterprise",
-                "version": "1.3.0",
+                "version": "1.4.0",
                 "status": "running",
                 "features": [
                     "Multi-Agent Orchestration",
